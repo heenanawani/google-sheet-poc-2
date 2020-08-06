@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="41c0456f-2d39-4fd3-9b34-3bfca28de393" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="e070ae3b-0f13-49c1-afb6-14877658c95f" basePath="/v4/spreadsheets/" >
+		<http:request-connection protocol="HTTPS" host="sheets.googleapis.com" />
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration1" doc:name="HTTP Request configuration" doc:id="d3df6d71-8618-4ca9-a146-cb471cfb25ea" >
+		<http:request-connection protocol="HTTPS" host="accounts.google.com" />
+	</http:request-config>
+	<flow name="google-sheetsFlow" doc:id="63aec7c6-a76d-4933-910f-df35ede6db7d" >
+		<http:listener doc:name="Listener" doc:id="71713fa8-060a-4359-bf7e-802c193b1b25" config-ref="HTTP_Listener_config" path="/token" allowedMethods="GET"/>
+		<http:request method="POST" doc:name="Request" doc:id="83a766c1-1803-46d9-8dde-ab4c7150ce11" config-ref="HTTP_Request_configuration1" path="/o/oauth2/token">
+			<http:body ><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+	"grant_type": "refresh_token",
+    "refresh_token":"1//0g2rzYQoXId5UCgYIARAAGBASNwF-L9Ir8q_bmQ5enyPXg5UdaKXe6F4GDEUkMxVy3ILQ9J1Lv3nOgurO1EIoTVvhdWLEyX4cekY",
+    "client_id":"694336659442-sglq5ktksn7r1ckgmbrglb357e54bf98.apps.googleusercontent.com",
+   "client_secret":"7ymJwaoIfhtJsaUrE8RneQHy"
+}]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="c0cfe1ac-476f-47e3-a7c0-3b41fdb606dd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value='#["Bearer " ++ payload."access_token"]' doc:name="access_token" doc:id="866414fb-6d0b-4d26-bb5c-8320a103f943" variableName="access_token" />
+		<flow-ref doc:name="Flow Reference" doc:id="f1162257-b453-4924-acf3-8b64dfaf726c" name="google-sheetsSub_Flow"/>
+	</flow>
+	<sub-flow name="google-sheetsSub_Flow" doc:id="db99966e-69e6-4f3f-a593-09926b3d1ebd" >
+		<set-payload value='#[{
+    "id" : 1,
+    "name" : "Rohit",
+    "address" : "yadav"
+}]' doc:name="Set Payload" doc:id="1ca7d1c9-c209-4350-923a-c47d7941f0b7" />
+		<ee:transform doc:name="Transform Message" doc:id="7a6e5eeb-ee36-4a7d-8410-cd5210911188">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+"range":"Sheet1",
+"majorDimension":"ROWS",
+"values" : [
+	[
+		payload.id,
+		payload.name,
+		payload."address"
+	]		
+ ]
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="7209d5a5-7b68-4b1f-bc73-4024efa7e15a" config-ref="HTTP_Request_configuration" path="1JczrCQE4pvLMTxSBxv1i3kre5-W6CQaXzXJ2rpFTJOc/values/Sheet1:append?valueInputOption=RAW">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.access_token
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="273651ef-9fcb-4be2-9cf8-143525df95b4" message="#[payload]" />
+	</sub-flow>
+</mule>
